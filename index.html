@@ -31,6 +31,7 @@
   .btn.primary { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
   .btn.green { background: #34c759; color: #fff; border-color: #34c759; }
   .btn.red { background: #ff3b30; color: #fff; border-color: #ff3b30; }
+  .btn.blue { background: #0071e3; color: #fff; border-color: #0071e3; }
   input[type="date"], input[type="text"], input[type="number"], input[type="time"] {
     padding: 6px 10px; border: 1px solid #d2d2d7; border-radius: 7px; font-size: 13px;
   }
@@ -39,6 +40,7 @@
     background: #f0f0f2; color: #86868b;
   }
   .badge.on { background: #d1f0d9; color: #1a7f37; }
+  .badge.warn { background: #fff3cd; color: #856404; }
 
   .card {
     background: #fff; border-radius: 10px; padding: 14px 16px;
@@ -93,14 +95,13 @@
   .diff-down { color: #d70015; font-weight: 700; }
   .time-col { width: 62px; background: #fafafa; font-weight: 500; }
 
-  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-  .label { font-size: 11px; color: #86868b; margin-bottom: 3px; }
   .log {
-    font-size: 12px; color: #86868b; max-height: 80px; overflow-y: auto;
+    font-size: 12px; color: #86868b; max-height: 120px; overflow-y: auto;
     background: #fafafa; border-radius: 6px; padding: 6px 10px; margin-top: 8px;
   }
   .empty { text-align: center; color: #86868b; padding: 24px; font-size: 13px; }
   #jsonFile { display: none; }
+  .tip { font-size: 12px; color: #0071e3; margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -110,8 +111,8 @@
 
   <div class="bar">
     <input type="date" id="datePick">
-    <button class="btn" onclick="changeDay(-1)">上一步</button>
-    <button class="btn primary" onclick="updateQuote()">更新報價</button>
+    <button class="btn" onclick="changeDay(-1)">上一日</button>
+    <button class="btn primary" onclick="updateQuote()">準備下一時間點</button>
     <button class="btn" id="autoBtn" onclick="toggleAuto()">啟動定時</button>
     
     <button class="btn green" onclick="document.getElementById('jsonFile').click()">匯入 JSON</button>
@@ -124,18 +125,23 @@
   </div>
 
   <div class="card">
-    <h2>操作說明</h2>
+    <h2>操作說明（自動化流程）</h2>
     <div class="log" id="log">
-      1. 雙擊「一鍵執行」→ 自動抓資料並產生 JSON<br>
-      2. 點綠色「匯入 JSON」選擇剛產生的檔案<br>
-      3. 表格會自動填入
+      <b>推薦流程（最穩定）：</b><br>
+      1. 安裝 Tampermonkey → 安裝「AAStocks 暗盤一鍵匯出」腳本<br>
+      2. 打開 <a href="https://www.aastocks.com/tc/stocks/market/ipo/greymarket.aspx" target="_blank">AAStocks 暗盤頁</a><br>
+      3. 在暗盤頁按「一鍵匯出 JSON」或快捷鍵 → 自動下載符合本工具的 JSON<br>
+      4. 回到本頁點綠色「匯入 JSON」→ 資料自動填入對應時間點<br>
+      5. 可啟動「定時」在 16:15–18:30 自動準備空欄位<br><br>
+      目前時間狀態會顯示在下方。
     </div>
+    <div class="tip" id="sessionTip">—</div>
   </div>
 
   <div class="card">
     <h2>人手加入股票</h2>
     <div style="display:flex;gap:8px;">
-      <input type="text" id="symInput" placeholder="例如：09941" style="flex:1;">
+      <input type="text" id="symInput" placeholder="例如：09941 或 09941,03625" style="flex:1;">
       <button class="btn primary" onclick="addSymbols()">加入</button>
     </div>
   </div>
@@ -162,7 +168,17 @@ function log(msg) {
   el.innerHTML = `[${t}] ${msg}<br>` + el.innerHTML;
 }
 function clock() {
-  document.getElementById('clock').textContent = new Date().toLocaleString('zh-HK',{hour12:false}) + '  香港時間';
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleString('zh-HK',{hour12:false}) + '  香港時間';
+  const hm = now.toTimeString().slice(0,5);
+  const tip = document.getElementById('sessionTip');
+  if (hm >= '16:15' && hm <= '18:30') {
+    tip.textContent = '✅ 目前在暗盤交易時段 (16:15–18:30)，適合抓取即時報價';
+    tip.style.color = '#1a7f37';
+  } else {
+    tip.textContent = '⏳ 目前不在暗盤時段，資料可能為收盤後最後一筆';
+    tip.style.color = '#856404';
+  }
 }
 setInterval(clock, 1000); clock();
 
@@ -220,11 +236,11 @@ function render() {
           <thead>
             <tr>
               <th rowspan="2" class="time-col">Time</th>
-              <th colspan="3">Turnover</th>
+              <th colspan="3">Turnover (M)</th>
               <th colspan="3">Price (HKD)</th>
             </tr>
             <tr>
-              <th>Futu(M)</th><th>Phillip(M)</th><th>Diff(M)</th>
+              <th>Futu</th><th>Phillip</th><th>Diff</th>
               <th>Futu</th><th>Phillip</th><th>Diff</th>
             </tr>
           </thead>
@@ -310,7 +326,7 @@ function updateQuote() {
     if (t) { day[sym][t] = { fTO:'', pTO:'', fP:'', pP:'' }; n++; }
   });
   save(); render();
-  log(n ? `已準備 ${n} 個時間點` : '全部時間點已填滿');
+  log(n ? `已準備 ${n} 個時間點（請用 AAStocks 腳本匯出後匯入）` : '全部時間點已填滿');
 }
 
 let timer = null, runs = 0;
@@ -324,11 +340,10 @@ function toggleAuto() {
     log('定時已停止');
     return;
   }
-  const mins = +document.getElementById('interval')?.value || 30;
   runs = 0;
   btn.textContent = '停止定時';
   st.textContent = '運行中'; st.className = 'badge on';
-  log(`定時啟動`);
+  log(`定時啟動（每 30 分鐘準備下一空欄）`);
   const tick = () => {
     const now = new Date().toTimeString().slice(0,5);
     if (now < '16:15' || now > '18:30') return;
@@ -336,7 +351,7 @@ function toggleAuto() {
     updateQuote();
   };
   tick();
-  timer = setInterval(tick, mins * 60000);
+  timer = setInterval(tick, 30 * 60000);
 }
 
 function clearDay() {
@@ -389,18 +404,24 @@ function importJSON(event) {
       const data = JSON.parse(e.target.result);
       let stocks = data.stocks || data;
       let targetDate = data.date || key();
+      // 支援腳本直接輸出 { "09941": { "16:20": {...} } } 或包 date 的格式
+      if (data.date && data.stocks) {
+        stocks = data.stocks;
+        targetDate = data.date;
+      }
       document.getElementById('datePick').value = targetDate;
       const day = ensure(targetDate);
       let count = 0;
       for (const [sym, times] of Object.entries(stocks)) {
-        if (!day[sym]) day[sym] = {};
+        const cleanSym = sym.replace(/\.HK$/i, '');
+        if (!day[cleanSym]) day[cleanSym] = {};
         for (const [t, values] of Object.entries(times)) {
           if (TIMES.includes(t)) {
-            day[sym][t] = {
-              fTO: values.fTO || '',
-              pTO: values.pTO || '',
-              fP:  values.fP  || '',
-              pP:  values.pP  || ''
+            day[cleanSym][t] = {
+              fTO: values.fTO || values.futuTO || '',
+              pTO: values.pTO || values.phillipTO || '',
+              fP:  values.fP  || values.futuP  || '',
+              pP:  values.pP  || values.phillipP  || ''
             };
             count++;
           }
@@ -408,10 +429,10 @@ function importJSON(event) {
       }
       save();
       render();
-      log(`成功匯入！共 ${count} 筆資料`);
+      log(`成功匯入！共 ${count} 筆資料（日期 ${targetDate}）`);
       event.target.value = '';
     } catch (err) {
-      alert('JSON 格式錯誤');
+      alert('JSON 格式錯誤：' + err.message);
       log('匯入失敗');
     }
   };
