@@ -57,12 +57,8 @@
     font-size: 20px;
     font-weight: 700;
     margin-bottom: 10px;
-    letter-spacing: 0.5px;
   }
-  .stock-actions {
-    text-align: right;
-    margin-bottom: 6px;
-  }
+  .stock-actions { text-align: right; margin-bottom: 6px; }
   .stock-actions .btn { font-size: 12px; padding: 3px 8px; }
 
   table.gm {
@@ -104,8 +100,6 @@
     background: #fafafa; border-radius: 6px; padding: 6px 10px; margin-top: 8px;
   }
   .empty { text-align: center; color: #86868b; padding: 24px; font-size: 13px; }
-
-  /* 隱藏的檔案選擇 */
   #jsonFile { display: none; }
 </style>
 </head>
@@ -120,9 +114,8 @@
     <button class="btn primary" onclick="updateQuote()">更新報價</button>
     <button class="btn" id="autoBtn" onclick="toggleAuto()">啟動定時</button>
     
-    <!-- 新增：匯入 JSON -->
     <button class="btn green" onclick="document.getElementById('jsonFile').click()">匯入 JSON</button>
-    <input type="file" id="jsonFile" accept=".json,application/json" onchange="importJSON(event)">
+    <input type="file" id="jsonFile" accept=".json" onchange="importJSON(event)">
     
     <button class="btn" onclick="exportExcel()">匯出 Excel</button>
     <button class="btn" onclick="exportPNG()">匯出 PNG</button>
@@ -131,34 +124,18 @@
   </div>
 
   <div class="card">
-    <h2>定時設定（目前只能在網頁開著時運作）</h2>
-    <div class="grid">
-      <div>
-        <div class="label">刷新間隔（分鐘）</div>
-        <input type="number" id="interval" value="30" min="5" max="60" style="width:100%">
-      </div>
-      <div>
-        <div class="label">最大次數（0=跑到結束）</div>
-        <input type="number" id="maxRun" value="0" min="0" style="width:100%">
-      </div>
-      <div>
-        <div class="label">開始時間</div>
-        <input type="time" id="startT" value="16:15" style="width:100%">
-      </div>
-      <div>
-        <div class="label">結束時間</div>
-        <input type="time" id="endT" value="18:30" style="width:100%">
-      </div>
-    </div>
+    <h2>操作說明</h2>
     <div class="log" id="log">
-      使用方法：Python 抓完資料後會產生 .json 檔 → 點「匯入 JSON」選擇該檔案即可自動填入表格。
+      1. 雙擊「一鍵執行」→ 自動抓資料並產生 JSON<br>
+      2. 點綠色「匯入 JSON」選擇剛產生的檔案<br>
+      3. 表格會自動填入
     </div>
   </div>
 
   <div class="card">
     <h2>人手加入股票</h2>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <input type="text" id="symInput" placeholder="例如：09941" style="flex:1;min-width:200px">
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="symInput" placeholder="例如：09941" style="flex:1;">
       <button class="btn primary" onclick="addSymbols()">加入</button>
     </div>
   </div>
@@ -168,7 +145,6 @@
 
 <script>
 const TIMES = ['16:20','16:50','17:20','17:50','18:20','18:30'];
-
 let store = {};
 function load() {
   try { store = JSON.parse(localStorage.getItem('gm_v5') || '{}'); } catch(e) { store = {}; }
@@ -186,8 +162,7 @@ function log(msg) {
   el.innerHTML = `[${t}] ${msg}<br>` + el.innerHTML;
 }
 function clock() {
-  document.getElementById('clock').textContent =
-    new Date().toLocaleString('zh-HK',{hour12:false}) + '  香港時間';
+  document.getElementById('clock').textContent = new Date().toLocaleString('zh-HK',{hour12:false}) + '  香港時間';
 }
 setInterval(clock, 1000); clock();
 
@@ -226,10 +201,9 @@ function render() {
   const day = store[d] || {};
   const box = document.getElementById('tables');
   box.innerHTML = '';
-
   const syms = Object.keys(day).sort();
   if (!syms.length) {
-    box.innerHTML = '<div class="card empty">今日尚無股票<br>請先加入代號 或 匯入 JSON</div>';
+    box.innerHTML = '<div class="card empty">今日尚無股票<br>請匯入 JSON 或手動加入</div>';
     return;
   }
 
@@ -250,16 +224,11 @@ function render() {
               <th colspan="3">Price (HKD)</th>
             </tr>
             <tr>
-              <th>Futu(M)</th>
-              <th>Phillip(M)</th>
-              <th>Diff(M)</th>
-              <th>Futu</th>
-              <th>Phillip</th>
-              <th>Diff</th>
+              <th>Futu(M)</th><th>Phillip(M)</th><th>Diff(M)</th>
+              <th>Futu</th><th>Phillip</th><th>Diff</th>
             </tr>
           </thead>
           <tbody>`;
-
     TIMES.forEach(t => {
       const r = data[t] || { fTO:'', pTO:'', fP:'', pP:'' };
       const toD = calcDiff(r.fTO, r.pTO);
@@ -281,15 +250,12 @@ function render() {
 }
 
 function onEdit(el) {
-  const sym = el.dataset.sym;
-  const t   = el.dataset.t;
-  const f   = el.dataset.f;
+  const sym = el.dataset.sym, t = el.dataset.t, f = el.dataset.f;
   const day = ensure(key());
   if (!day[sym]) day[sym] = {};
   if (!day[sym][t]) day[sym][t] = { fTO:'', pTO:'', fP:'', pP:'' };
   day[sym][t][f] = el.value.trim();
   save();
-
   const r = day[sym][t];
   const toD = calcDiff(r.fTO, r.pTO);
   const pD  = calcDiff(r.fP, r.pP);
@@ -312,8 +278,7 @@ function changeDay(n) {
 }
 
 function getNextEmpty(sym) {
-  const day = ensure(key());
-  const data = day[sym] || {};
+  const data = (ensure(key())[sym] || {});
   for (const t of TIMES) {
     const r = data[t];
     if (!r || (r.fTO==='' && r.pTO==='' && r.fP==='' && r.pP==='')) return t;
@@ -327,8 +292,7 @@ function fillNext(sym) {
   const day = ensure(key());
   if (!day[sym]) day[sym] = {};
   day[sym][t] = { fTO:'', pTO:'', fP:'', pP:'' };
-  save();
-  render();
+  save(); render();
   log(`${sym} 已準備 ${t}`);
 }
 
@@ -343,13 +307,9 @@ function updateQuote() {
   let n = 0;
   syms.forEach(sym => {
     const t = getNextEmpty(sym);
-    if (t) {
-      day[sym][t] = { fTO:'', pTO:'', fP:'', pP:'' };
-      n++;
-    }
+    if (t) { day[sym][t] = { fTO:'', pTO:'', fP:'', pP:'' }; n++; }
   });
-  save();
-  render();
+  save(); render();
   log(n ? `已準備 ${n} 個時間點` : '全部時間點已填滿');
 }
 
@@ -364,19 +324,14 @@ function toggleAuto() {
     log('定時已停止');
     return;
   }
-  const mins = +document.getElementById('interval').value || 30;
-  const max  = +document.getElementById('maxRun').value;
+  const mins = +document.getElementById('interval')?.value || 30;
   runs = 0;
   btn.textContent = '停止定時';
   st.textContent = '運行中'; st.className = 'badge on';
-  log(`定時啟動（僅限網頁開著時有效）`);
-
+  log(`定時啟動`);
   const tick = () => {
     const now = new Date().toTimeString().slice(0,5);
-    const s = document.getElementById('startT').value;
-    const e = document.getElementById('endT').value;
-    if (now < s || now > e) { log('非暗盤時段'); return; }
-    if (max > 0 && runs >= max) { toggleAuto(); return; }
+    if (now < '16:15' || now > '18:30') return;
     runs++;
     updateQuote();
   };
@@ -387,8 +342,7 @@ function toggleAuto() {
 function clearDay() {
   if (!confirm('確定清除今日全部資料？')) return;
   delete store[key()];
-  save();
-  render();
+  save(); render();
   log('已清除');
 }
 
@@ -412,57 +366,59 @@ function exportExcel() {
 }
 
 async function exportPNG() {
-  const blocks = document.querySelectorAll('.stock-block');
-  if (!blocks.length) {
-    alert('沒有表格可匯出');
-    return;
-  }
-
   document.querySelectorAll('.stock-actions').forEach(el => el.style.display = 'none');
-
   try {
     const canvas = await html2canvas(document.getElementById('tables'), {
-      scale: 2,
-      backgroundColor: '#ffffff',
-      useCORS: true,
-      logging: false
+      scale: 2, backgroundColor: '#ffffff', useCORS: true
     });
-
     const a = document.createElement('a');
     a.href = canvas.toDataURL('image/png');
     a.download = `暗盤_${key()}.png`;
     a.click();
     log('已匯出 PNG');
-  } catch (err) {
-    console.error(err);
-    alert('匯出失敗，請再試一次');
-  }
-
+  } catch(e) { alert('匯出失敗'); }
   document.querySelectorAll('.stock-actions').forEach(el => el.style.display = '');
 }
 
-// ===================== 核心：匯入 JSON =====================
 function importJSON(event) {
   const file = event.target.files[0];
   if (!file) return;
-
   const reader = new FileReader();
   reader.onload = function(e) {
     try {
       const data = JSON.parse(e.target.result);
-
-      // 支援兩種格式：
-      // 1. 完整格式 { date, stocks: { "09941": { "16:20": {...} } } }
-      // 2. 直接是 stocks 物件
-
       let stocks = data.stocks || data;
       let targetDate = data.date || key();
-
-      // 切換到對應日期
       document.getElementById('datePick').value = targetDate;
-
       const day = ensure(targetDate);
-
       let count = 0;
       for (const [sym, times] of Object.entries(stocks)) {
-        if (!day[sym]) 
+        if (!day[sym]) day[sym] = {};
+        for (const [t, values] of Object.entries(times)) {
+          if (TIMES.includes(t)) {
+            day[sym][t] = {
+              fTO: values.fTO || '',
+              pTO: values.pTO || '',
+              fP:  values.fP  || '',
+              pP:  values.pP  || ''
+            };
+            count++;
+          }
+        }
+      }
+      save();
+      render();
+      log(`成功匯入！共 ${count} 筆資料`);
+      event.target.value = '';
+    } catch (err) {
+      alert('JSON 格式錯誤');
+      log('匯入失敗');
+    }
+  };
+  reader.readAsText(file);
+}
+
+render();
+</script>
+</body>
+</html>
