@@ -466,4 +466,32 @@ async function exportPNG() {
           <td style="border:1px solid #000;padding:5px;text-align:center;${toD.cls==='diff-up'?'color:#1a7f37;font-weight:bold;':toD.cls==='diff-down'?'color:#d70015;font-weight:bold;':''}">${toD.val}</td>
           <td style="border:1px solid #000;padding:5px;text-align:center;">${r.fP||''}</td>
           <td style="border:1px solid #000;padding:5px;text-align:center;">${r.pP||''}</td>
-          <td style="border:1px solid 
+          <td style="border:1px solid #000;padding:5px;text-align:center;${pD.cls==='diff-up'?'color:#1a7f37;font-weight:bold;':pD.cls==='diff-down'?'color:#d70015;font-weight:bold;':''}">${pD.val}</td>
+        </tr>`;
+    });
+    html += `</tbody></table></div>`;
+    area.insertAdjacentHTML('beforeend', html);
+  });
+
+  // 等一下再截圖
+  await new Promise(r => setTimeout(r, 100));
+
+  const canvas = await html2canvas(area, {
+    scale: 2,
+    backgroundColor: '#ffffff',
+    useCORS: true
+  });
+
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = `暗盤_${d}.png`;
+  a.click();
+
+  area.innerHTML = ''; // 清掉
+  log('已匯出 PNG（格式接近圖二）');
+}
+
+render();
+</script>
+</body>
+</html>
