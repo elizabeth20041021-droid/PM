@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>暗盤記錄</title>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -13,11 +14,10 @@
     padding: 16px;
     font-size: 14px;
   }
-  .wrap { max-width: 980px; margin: 0 auto; }
+  .wrap { max-width: 920px; margin: 0 auto; }
   h1 { font-size: 20px; font-weight: 700; margin-bottom: 2px; }
   .sub { font-size: 12px; color: #86868b; margin-bottom: 14px; }
 
-  /* 頂部工具列 */
   .bar {
     display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
     background: #fff; border-radius: 10px; padding: 10px 12px;
@@ -29,7 +29,6 @@
   }
   .btn:hover { background: #f0f0f2; }
   .btn.primary { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
-  .btn.primary:hover { background: #333; }
   .btn.red { background: #ff3b30; color: #fff; border-color: #ff3b30; }
   input[type="date"], input[type="text"], input[type="number"], input[type="time"] {
     padding: 6px 10px; border: 1px solid #d2d2d7; border-radius: 7px; font-size: 13px;
@@ -40,38 +39,63 @@
   }
   .badge.on { background: #d1f0d9; color: #1a7f37; }
 
-  /* 卡片 */
   .card {
     background: #fff; border-radius: 10px; padding: 14px 16px;
     margin-bottom: 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
   }
   .card h2 { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
 
-  /* 股票標題 */
-  .stock-head {
-    display: flex; justify-content: space-between; align-items: center;
-    margin: 18px 0 6px;
+  /* ===== 表格樣式（盡量接近圖二） ===== */
+  .stock-block {
+    margin-bottom: 28px;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
   }
-  .stock-head b { font-size: 16px; }
+  .stock-title {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 700;
+    padding: 10px 0 6px;
+    letter-spacing: 0.5px;
+  }
+  .stock-actions {
+    text-align: right;
+    padding: 0 8px 6px;
+  }
+  .stock-actions .btn { font-size: 12px; padding: 3px 8px; }
 
-  /* 表格（對齊圖三） */
-  table {
-    width: 100%; border-collapse: collapse; font-size: 13px;
-    border: 1px solid #d2d2d7;
+  table.gm {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    border: 1px solid #333;
   }
-  th, td {
-    border: 1px solid #d2d2d7; padding: 6px 8px; text-align: center;
+  table.gm th, table.gm td {
+    border: 1px solid #333;
+    padding: 5px 6px;
+    text-align: center;
   }
-  th { background: #fafafa; font-weight: 600; font-size: 12px; color: #555; }
-  td input {
-    width: 100%; border: none; text-align: center; font-size: 13px;
-    background: transparent; padding: 2px 0;
+  table.gm th {
+    background: #f7f7f7;
+    font-weight: 600;
+    font-size: 12px;
   }
-  td input:focus { outline: 2px solid #0071e3; background: #f0f7ff; }
-  .diff-up { color: #34c759; font-weight: 600; }
-  .diff-down { color: #ff3b30; font-weight: 600; }
-  .time-col { width: 70px; background: #fafafa; font-weight: 500; }
-  .adj { width: 70px; }
+  table.gm td input {
+    width: 100%;
+    border: none;
+    text-align: center;
+    font-size: 13px;
+    background: transparent;
+    padding: 1px 0;
+  }
+  table.gm td input:focus {
+    outline: 2px solid #0071e3;
+    background: #f0f7ff;
+  }
+  .diff-up { color: #1a7f37; font-weight: 600; }
+  .diff-down { color: #d70015; font-weight: 600; }
+  .time-col { width: 64px; background: #fafafa; font-weight: 500; }
 
   .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
   .label { font-size: 11px; color: #86868b; margin-bottom: 3px; }
@@ -80,6 +104,15 @@
     background: #fafafa; border-radius: 6px; padding: 6px 10px; margin-top: 8px;
   }
   .empty { text-align: center; color: #86868b; padding: 24px; font-size: 13px; }
+
+  /* 匯出用隱藏容器 */
+  #exportArea {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    background: #fff;
+    padding: 20px;
+  }
 </style>
 </head>
 <body>
@@ -87,18 +120,17 @@
   <h1>暗盤記錄</h1>
   <div class="sub" id="clock">—</div>
 
-  <!-- 工具列 -->
   <div class="bar">
     <input type="date" id="datePick">
     <button class="btn" onclick="changeDay(-1)">上一步</button>
     <button class="btn primary" onclick="updateQuote()">更新報價</button>
     <button class="btn" id="autoBtn" onclick="toggleAuto()">啟動定時</button>
-    <button class="btn" onclick="exportCSV()">匯出 CSV</button>
+    <button class="btn" onclick="exportExcel()">匯出 Excel</button>
+    <button class="btn" onclick="exportPNG()">匯出 PNG</button>
     <button class="btn red" onclick="clearDay()">清除今日</button>
     <span class="badge" id="status">已停止</span>
   </div>
 
-  <!-- 定時設定 -->
   <div class="card">
     <h2>定時設定</h2>
     <div class="grid">
@@ -119,35 +151,35 @@
         <input type="time" id="endT" value="18:30" style="width:100%">
       </div>
     </div>
-    <div class="log" id="log">準備就緒。時間點固定為 16:20 / 16:50 / 17:20 / 17:50 / 18:20 / 18:30</div>
+    <div class="log" id="log">時間點固定：16:20 / 16:50 / 17:20 / 17:50 / 18:20 / 18:30</div>
   </div>
 
-  <!-- 手動加入 -->
   <div class="card">
     <h2>人手加入股票</h2>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <input type="text" id="symInput" placeholder="例如：09941,7672,9917" style="flex:1;min-width:200px">
+      <input type="text" id="symInput" placeholder="例如：09941" style="flex:1;min-width:200px">
       <button class="btn primary" onclick="addSymbols()">加入</button>
     </div>
     <p style="font-size:12px;color:#86868b;margin-top:8px">
-      今日 aastocks 顯示有暗盤：<b>09941.HK（先通醫藥－Ｂ）</b>。可先加入此代號。
+      今日 aastocks 顯示：<b>09941.HK（先通醫藥－Ｂ）</b>
     </p>
   </div>
 
-  <!-- 表格區 -->
   <div id="tables"></div>
 </div>
+
+<!-- 專門用來產生乾淨 PNG 的區域 -->
+<div id="exportArea"></div>
 
 <script>
 const TIMES = ['16:20','16:50','17:20','17:50','18:20','18:30'];
 
-// 安全儲存
 let store = {};
 function load() {
-  try { store = JSON.parse(localStorage.getItem('gm_v3') || '{}'); } catch(e) { store = {}; }
+  try { store = JSON.parse(localStorage.getItem('gm_v4') || '{}'); } catch(e) { store = {}; }
 }
 function save() {
-  try { localStorage.setItem('gm_v3', JSON.stringify(store)); } catch(e) {}
+  try { localStorage.setItem('gm_v4', JSON.stringify(store)); } catch(e) {}
 }
 load();
 
@@ -167,7 +199,6 @@ setInterval(clock, 1000); clock();
 document.getElementById('datePick').value = today();
 document.getElementById('datePick').onchange = render;
 
-// ===== 資料結構 =====
 function ensure(d) {
   if (!store[d]) store[d] = {};
   return store[d];
@@ -189,7 +220,12 @@ function addSymbols() {
   log('已加入：' + list.join(', '));
 }
 
-// ===== 渲染（對齊圖三表格）=====
+function calcDiff(a, b) {
+  if (a === '' || b === '' || isNaN(+a) || isNaN(+b)) return { val: '—', cls: '' };
+  const d = (+a - +b).toFixed(2);
+  return { val: d, cls: +d >= 0 ? 'diff-up' : 'diff-down' };
+}
+
 function render() {
   const d = key();
   const day = store[d] || {};
@@ -198,62 +234,55 @@ function render() {
 
   const syms = Object.keys(day).sort();
   if (!syms.length) {
-    box.innerHTML = '<div class="card empty">今日尚無股票<br>請先在上方加入代號（例如 09941）</div>';
+    box.innerHTML = '<div class="card empty">今日尚無股票<br>請先加入 09941</div>';
     return;
   }
 
   syms.forEach(sym => {
     const data = day[sym];
     let html = `
-      <div class="stock-head">
-        <b>${sym}.HK</b>
-        <div>
-          <button class="btn" style="font-size:12px;padding:4px 8px" onclick="fillNext('${sym}')">填下一時間</button>
-          <button class="btn" style="font-size:12px;padding:4px 8px" onclick="delSym('${sym}')">刪除</button>
+      <div class="stock-block" id="block_${sym}">
+        <div class="stock-title">${sym}.HK</div>
+        <div class="stock-actions">
+          <button class="btn" onclick="fillNext('${sym}')">填下一時間</button>
+          <button class="btn" onclick="delSym('${sym}')">刪除</button>
         </div>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th rowspan="2" class="time-col">Time</th>
-            <th colspan="3">Turnover</th>
-            <th colspan="3">Price (HKD)</th>
-            <th rowspan="2" class="adj">調整</th>
-          </tr>
-          <tr>
-            <th>Futu(M)</th><th>Phillip(M)</th><th>Diff(M)</th>
-            <th>Futu</th><th>Phillip</th><th>Diff</th>
-          </tr>
-        </thead>
-        <tbody>`;
+        <table class="gm">
+          <thead>
+            <tr>
+              <th rowspan="2" class="time-col">Time</th>
+              <th colspan="3">Turnover</th>
+              <th colspan="3">Price (HKD)</th>
+            </tr>
+            <tr>
+              <th>Futu(M)</th>
+              <th>Phillip(M)</th>
+              <th>Diff(M)</th>
+              <th>Futu</th>
+              <th>Phillip</th>
+              <th>Diff</th>
+            </tr>
+          </thead>
+          <tbody>`;
 
     TIMES.forEach(t => {
       const r = data[t] || { fTO:'', pTO:'', fP:'', pP:'' };
-      const toDiff = calcDiff(r.fTO, r.pTO);
-      const pDiff  = calcDiff(r.fP, r.pP);
+      const toD = calcDiff(r.fTO, r.pTO);
+      const pD  = calcDiff(r.fP, r.pP);
       html += `
         <tr>
           <td class="time-col">${t}</td>
           <td><input data-sym="${sym}" data-t="${t}" data-f="fTO" value="${r.fTO}" oninput="onEdit(this)"></td>
           <td><input data-sym="${sym}" data-t="${t}" data-f="pTO" value="${r.pTO}" oninput="onEdit(this)"></td>
-          <td class="${toDiff.cls}" id="to_${sym}_${t}">${toDiff.val}</td>
+          <td class="${toD.cls}" id="to_${sym}_${t}">${toD.val}</td>
           <td><input data-sym="${sym}" data-t="${t}" data-f="fP" value="${r.fP}" oninput="onEdit(this)"></td>
           <td><input data-sym="${sym}" data-t="${t}" data-f="pP" value="${r.pP}" oninput="onEdit(this)"></td>
-          <td class="${pDiff.cls}" id="p_${sym}_${t}">${pDiff.val}</td>
-          <td>
-            <button class="btn" style="padding:2px 6px;font-size:11px" onclick="clearRow('${sym}','${t}')">清</button>
-          </td>
+          <td class="${pD.cls}" id="p_${sym}_${t}">${pD.val}</td>
         </tr>`;
     });
-    html += '</tbody></table>';
+    html += `</tbody></table></div>`;
     box.insertAdjacentHTML('beforeend', html);
   });
-}
-
-function calcDiff(a, b) {
-  if (a === '' || b === '' || isNaN(a) || isNaN(b)) return { val: '—', cls: '' };
-  const d = (+a - +b).toFixed(2);
-  return { val: d, cls: d >= 0 ? 'diff-up' : 'diff-down' };
 }
 
 function onEdit(el) {
@@ -263,10 +292,9 @@ function onEdit(el) {
   const day = ensure(key());
   if (!day[sym]) day[sym] = {};
   if (!day[sym][t]) day[sym][t] = { fTO:'', pTO:'', fP:'', pP:'' };
-  day[sym][t][f] = el.value;
+  day[sym][t][f] = el.value.trim();
   save();
 
-  // 即時更新 Diff
   const r = day[sym][t];
   const toD = calcDiff(r.fTO, r.pTO);
   const pD  = calcDiff(r.fP, r.pP);
@@ -274,13 +302,6 @@ function onEdit(el) {
   const pEl  = document.getElementById(`p_${sym}_${t}`);
   if (toEl) { toEl.textContent = toD.val; toEl.className = toD.cls; }
   if (pEl)  { pEl.textContent  = pD.val;  pEl.className  = pD.cls; }
-}
-
-function clearRow(sym, t) {
-  const day = ensure(key());
-  if (day[sym]) day[sym][t] = { fTO:'', pTO:'', fP:'', pP:'' };
-  save();
-  render();
 }
 
 function delSym(sym) {
@@ -295,58 +316,48 @@ function changeDay(n) {
   render();
 }
 
-// ===== 更新報價：自動填下一個空白時間點 =====
 function getNextEmpty(sym) {
   const day = ensure(key());
   const data = day[sym] || {};
   for (const t of TIMES) {
     const r = data[t];
-    if (!r || (r.fTO === '' && r.pTO === '' && r.fP === '' && r.pP === '')) return t;
+    if (!r || (r.fTO==='' && r.pTO==='' && r.fP==='' && r.pP==='')) return t;
   }
   return null;
 }
 
 function fillNext(sym) {
   const t = getNextEmpty(sym);
-  if (!t) {
-    log(sym + ' 所有時間點已填滿');
-    return;
-  }
-  // 給空白列，方便使用者直接輸入
+  if (!t) { log(sym + ' 已全部填滿'); return; }
   const day = ensure(key());
   if (!day[sym]) day[sym] = {};
   day[sym][t] = { fTO:'', pTO:'', fP:'', pP:'' };
   save();
   render();
-  log(`${sym} 已準備 ${t} 時間點，請直接輸入數字`);
+  log(`${sym} 已準備 ${t}`);
 }
 
 function updateQuote() {
-  const d = key();
-  const day = store[d] || {};
+  const day = store[key()] || {};
   const syms = Object.keys(day);
   if (!syms.length) {
-    // 自動加入今日已知股票
     document.getElementById('symInput').value = '09941';
     addSymbols();
-    log('已自動加入今日暗盤股票 09941');
     return;
   }
-  let filled = 0;
+  let n = 0;
   syms.forEach(sym => {
     const t = getNextEmpty(sym);
     if (t) {
       day[sym][t] = { fTO:'', pTO:'', fP:'', pP:'' };
-      filled++;
+      n++;
     }
   });
   save();
   render();
-  if (filled) log(`已為 ${filled} 隻股票準備下一個時間點，請輸入數字`);
-  else log('所有時間點已填滿');
+  log(n ? `已準備 ${n} 個時間點，請輸入數字` : '全部時間點已填滿');
 }
 
-// ===== 定時 =====
 let timer = null, runs = 0;
 function toggleAuto() {
   const btn = document.getElementById('autoBtn');
@@ -363,13 +374,13 @@ function toggleAuto() {
   runs = 0;
   btn.textContent = '停止定時';
   st.textContent = '運行中'; st.className = 'badge on';
-  log(`定時啟動，每 ${mins} 分鐘推進一次時間點`);
+  log(`定時啟動，每 ${mins} 分鐘`);
 
   const tick = () => {
     const now = new Date().toTimeString().slice(0,5);
     const s = document.getElementById('startT').value;
     const e = document.getElementById('endT').value;
-    if (now < s || now > e) { log('非暗盤時段，跳過'); return; }
+    if (now < s || now > e) { log('非暗盤時段'); return; }
     if (max > 0 && runs >= max) { toggleAuto(); return; }
     runs++;
     updateQuote();
@@ -383,13 +394,14 @@ function clearDay() {
   delete store[key()];
   save();
   render();
-  log('已清除今日');
+  log('已清除');
 }
 
-function exportCSV() {
+// ===== 匯出 Excel (CSV) =====
+function exportExcel() {
   const d = key();
   const day = store[d] || {};
-  let csv = '股票,時間,Futu成交,Phillip成交,成交Diff,Futu價,Phillip價,價格Diff\n';
+  let csv = '股票,時間,Futu成交(M),Phillip成交(M),成交Diff,Futu價,Phillip價,價格Diff\n';
   Object.keys(day).forEach(s => {
     TIMES.forEach(t => {
       const r = day[s][t] || {};
@@ -399,14 +411,59 @@ function exportCSV() {
     });
   });
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob(['\ufeff'+csv], {type:'text/csv'}));
+  a.href = URL.createObjectURL(new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'}));
   a.download = `暗盤_${d}.csv`;
   a.click();
-  log('已匯出 CSV');
+  log('已匯出 Excel (CSV)');
 }
 
-// 啟動
-render();
-</script>
-</body>
-</html>
+// ===== 匯出 PNG（乾淨版，接近圖二）=====
+async function exportPNG() {
+  const d = key();
+  const day = store[d] || {};
+  const syms = Object.keys(day).sort();
+  if (!syms.length) {
+    alert('沒有資料可匯出');
+    return;
+  }
+
+  // 建立乾淨的匯出內容
+  const area = document.getElementById('exportArea');
+  area.innerHTML = '';
+
+  syms.forEach(sym => {
+    const data = day[sym];
+    let html = `
+      <div style="margin-bottom:30px;font-family:Arial,sans-serif;">
+        <div style="text-align:center;font-size:20px;font-weight:bold;margin-bottom:8px;">${sym}.HK</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;border:1px solid #000;">
+          <thead>
+            <tr>
+              <th style="border:1px solid #000;padding:6px;background:#f5f5f5;" rowspan="2">Time</th>
+              <th style="border:1px solid #000;padding:6px;background:#f5f5f5;" colspan="3">Turnover</th>
+              <th style="border:1px solid #000;padding:6px;background:#f5f5f5;" colspan="3">Price (HKD)</th>
+            </tr>
+            <tr>
+              <th style="border:1px solid #000;padding:5px;background:#f5f5f5;">Futu(M)</th>
+              <th style="border:1px solid #000;padding:5px;background:#f5f5f5;">Phillip(M)</th>
+              <th style="border:1px solid #000;padding:5px;background:#f5f5f5;">Diff(M)</th>
+              <th style="border:1px solid #000;padding:5px;background:#f5f5f5;">Futu</th>
+              <th style="border:1px solid #000;padding:5px;background:#f5f5f5;">Phillip</th>
+              <th style="border:1px solid #000;padding:5px;background:#f5f5f5;">Diff</th>
+            </tr>
+          </thead>
+          <tbody>`;
+
+    TIMES.forEach(t => {
+      const r = data[t] || {};
+      const toD = calcDiff(r.fTO, r.pTO);
+      const pD  = calcDiff(r.fP, r.pP);
+      html += `
+        <tr>
+          <td style="border:1px solid #000;padding:5px;text-align:center;">${t}</td>
+          <td style="border:1px solid #000;padding:5px;text-align:center;">${r.fTO||''}</td>
+          <td style="border:1px solid #000;padding:5px;text-align:center;">${r.pTO||''}</td>
+          <td style="border:1px solid #000;padding:5px;text-align:center;${toD.cls==='diff-up'?'color:#1a7f37;font-weight:bold;':toD.cls==='diff-down'?'color:#d70015;font-weight:bold;':''}">${toD.val}</td>
+          <td style="border:1px solid #000;padding:5px;text-align:center;">${r.fP||''}</td>
+          <td style="border:1px solid #000;padding:5px;text-align:center;">${r.pP||''}</td>
+          <td style="border:1px solid 
