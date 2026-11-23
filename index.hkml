@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>暗盤記錄</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
+    background: #f5f5f7;
+    color: #1d1d1f;
+    padding: 20px;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .sub { font-size: 13px; color: #86868b; margin-bottom: 20px; }
+
+  /* 工具列 */
+  .bar {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    background: #fff; border-radius: 12px; padding: 12px 16px;
+    margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .btn {
+    padding: 8px 14px; border-radius: 8px; border: none;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    background: #f0f0f2; color: #1d1d1f; transition: 0.15s;
+  }
+  .btn:hover { background: #e5e5ea; }
+  .btn.blue { background: #0071e3; color: #fff; }
+  .btn.blue:hover { background: #0077ed; }
+  .btn.red { background: #ff3b30; color: #fff; }
+  input, select {
+    padding: 7px 10px; border: 1px solid #d2d2d7; border-radius: 8px;
+    font-size: 13px; background: #fff;
+  }
+
+  /* 卡片 */
+  .card {
+    background: #fff; border-radius: 12px; padding: 16px 20px;
+    margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+
+  /* 表格 */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 9px 10px; text-align: right; border-bottom: 1px solid #f0f0f2; }
+  th { background: #fafafa; font-weight: 600; text-align: center; color: #86868b; font-size: 12px; }
+  td:first-child, th:first-child { text-align: left; }
+  .up { color: #34c759; }
+  .down { color: #ff3b30; }
+  .stock-title {
+    font-size: 16px; font-weight: 700; margin: 18px 0 8px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+
+  /* 設定區 */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .label { font-size: 12px; color: #86868b; margin-bottom: 4px; }
+
+  /* 手動輸入 */
+  textarea {
+    width: 100%; height: 70px; padding: 10px; border: 1px solid #d2d2d7;
+    border-radius: 8px; font-family: ui-monospace, monospace; font-size: 12px;
+    resize: vertical;
+  }
+
+  /* 圖表 */
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .charts { grid-template-columns: 1fr; } }
+  .chart-box { height: 260px; }
+
+  .log {
+    font-size: 12px; color: #86868b; max-height: 90px; overflow-y: auto;
+    background: #fafafa; border-radius: 8px; padding: 8px 12px; margin-top: 10px;
+  }
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: 12px; font-weight: 600;
+  }
+  .on { background: #d1f0d9; color: #1a7f37; }
+  .off { background: #f0f0f2; color: #86868b; }
+  .empty { text-align: center; color: #86868b; padding: 30px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>暗盤記錄</h1>
+  <div class="sub" id="clock">—</div>
+
+  <!-- 工具列 -->
+  <div class="bar">
+    <input type="date" id="datePick">
+    <button class="btn" onclick="changeDay(-1)">← 前一天</button>
+    <button class="btn blue" onclick="doUpdate()">更新報價</button>
+    <button class="btn" id="autoBtn" onclick="toggleAuto()">啟動定時</button>
+    <button class="btn" onclick="exportCSV()">匯出 CSV</button>
+    <button class="btn red" onclick="clearDay()">清除今日</button>
+    <span class="badge off" id="status">已停止</span>
+  </div>
+
+  <!-- 設定 -->
+  <div class="card">
+    <h2>定時設定</h2>
+    <div class="grid">
+      <div>
+        <div class="label">刷新間隔（分鐘）</div>
+        <input type="number" id="interval" value="10" min="1" max="30" style="width:100%">
+      </div>
+      <div>
+        <div class="label">最大次數（0=跑到結束）</div>
+        <input type="number" id="maxRun" value="0" min="0" style="width:100%">
+      </div>
+      <div>
+        <div class="label">開始時間</div>
+        <input type="time" id="startT" value="16:15" style="width:100%">
+      </div>
+      <div>
+        <div class="label">結束時間</div>
+        <input type="time" id="endT" value="18:30" style="width:100%">
+      </div>
+    </div>
+    <div class="log" id="log">準備就緒</div>
+  </div>
+
+  <!-- 手動輸入 -->
+  <div class="card">
+    <h2>手動加入資料</h2>
+    <p style="font-size:12px;color:#86868b;margin-bottom:8px">
+      每行一筆，格式：<b>股票,時間,富途成交,輝立成交,富途價,輝立價</b><br>
+      例如：7672,16:20,18.40,12.90,10.40,10.52
+    </p>
+    <textarea id="paste" placeholder="在這裡貼上資料…"></textarea>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn blue" onclick="addPaste()">加入資料</button>
+      <input type="text" id="symInput" placeholder="快速加股票：7672,9917" style="flex:1;min-width:180px">
+      <button class="btn" onclick="addSyms()">加入股票</button>
+    </div>
+  </div>
+
+  <!-- 表格區 -->
+  <div id="tables"></div>
+
+  <!-- 圖表 -->
+  <div class="card">
+    <h2>價格 & 成交對比</h2>
+    <div class="charts">
+      <div class="chart-box"><canvas id="c1"></canvas></div>
+      <div class="chart-box"><canvas id="c2"></canvas></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ===== 安全儲存（避開沙箱錯誤）=====
+let mem = {};
+function load() {
+  try {
+    const s = localStorage.getItem('gm_v2');
+    if (s) mem = JSON.parse(s);
+  } catch(e) { mem = {}; }
+}
+function save() {
+  try { localStorage.setItem('gm_v2', JSON.stringify(mem)); } catch(e) {}
+}
+load();
+
+// ===== 工具 =====
+function today() {
+  return new Date().toISOString().slice(0,10);
+}
+function key() {
+  return document.getElementById('datePick').value || today();
+}
+function log(m) {
+  const el = document.getElementById('log');
+  const t = new Date().toLocaleTimeString('zh-HK',{hour12:false});
+  el.innerHTML = `[${t}] ${m}<br>` + el.innerHTML;
+}
+function clock() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleString('zh-HK',{hour12:false}) + '  香港時間';
+}
+setInterval(clock,1000); clock();
+
+// ===== 初始化 =====
+document.getElementById('datePick').value = today();
+document.getElementById('datePick').onchange = render;
+
+// ===== 資料操作 =====
+function ensure(d) {
+  if (!mem[d]) mem[d] = {};
+  return mem[d];
+}
+function addRow(sym, time, fTO, pTO, fP, pP) {
+  const d = key();
+  const day = ensure(d);
+  if (!day[sym]) day[sym] = [];
+  day[sym] = day[sym].filter(r => r.t !== time);
+  day[sym].push({
+    t: time,
+    fTO: +fTO, pTO: +pTO,
+    fP: +fP, pP: +pP
+  });
+  day[sym].sort((a,b) => a.t.localeCompare(b.t));
+  save();
+  render();
+}
+
+function addPaste() {
+  const txt = document.getElementById('paste').value.trim();
+  if (!txt) return;
+  let n = 0;
+  txt.split('\n').forEach(line => {
+    const p = line.split(/[,\s\t]+/).map(x=>x.trim()).filter(Boolean);
+    if (p.length >= 6) {
+      addRow(p[0].replace('.HK',''), p[1], p[2], p[3], p[4], p[5]);
+      n++;
+    }
+  });
+  document.getElementById('paste').value = '';
+  log(`成功加入 ${n} 筆`);
+}
+
+function addSyms() {
+  const raw = document.getElementById('symInput').value;
+  const list = raw.split(/[,，\s]+/).map(s=>s.trim().replace('.HK','')).filter(Boolean);
+  const day = ensure(key());
+  list.forEach(s => { if (!day[s]) day[s] = []; });
+  save();
+  document.getElementById('symInput').value = '';
+  render();
+  log('已加入：' + list.join(', '));
+}
+
+// ===== 畫面 =====
+function render() {
+  const d = key();
+  const day = mem[d] || {};
+  const box = document.getElementById('tables');
+  box.innerHTML = '';
+  const syms = Object.keys(day).sort();
+
+  if (!syms.length) {
+    box.innerHTML = '<div class="card empty">今日尚無資料<br>請先加入股票或貼上報價</div>';
+    draw([], []);
+    return;
+  }
+
+  syms.forEach(sym => {
+    const rows = day[sym] || [];
+    let html = `<div class="stock-title">${sym}.HK
+      <button class="btn" style="font-size:12px;padding:4px 10px" onclick="delSym('${sym}')">移除</button>
+    </div>
+    <div class="card" style="padding:0;overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th rowspan="2">時間</th>
+          <th colspan="3">成交額 (百萬)</th>
+          <th colspan="3">價格 (HKD)</th>
+        </tr>
+        <tr>
+          <th>富途</th><th>輝立</th><th>差額</th>
+          <th>富途</th><th>輝立</th><th>差額</th>
+        </tr>
+      </thead>
+      <tbody>`;
+    rows.forEach(r => {
+      const toD = (r.fTO - r.pTO).toFixed(2);
+      const pD  = (r.fP  - r.pP ).toFixed(2);
+      html += `<tr>
+        <td>${r.t}</td>
+        <td>${r.fTO.toFixed(2)}</td>
+        <td>${r.pTO.toFixed(2)}</td>
+        <td class="${toD>=0?'up':'down'}">${toD}</td>
+        <td>${r.fP.toFixed(2)}</td>
+        <td>${r.pP.toFixed(2)}</td>
+        <td class="${pD>=0?'up':'down'}">${pD}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+    box.insertAdjacentHTML('beforeend', html);
+  });
+
+  // 圖表用第一隻股票
+  const first = day[syms[0]] || [];
+  draw(first.map(r=>r.t), first);
+}
+
+function delSym(s) {
+  const d = key();
+  if (mem[d]) { delete mem[d][s]; save(); render(); }
+}
+
+function changeDay(n) {
+  const d = new Date(document.getElementById('datePick').value);
+  d.setDate(d.getDate() + n);
+  document.getElementById('datePick').value = d.toISOString().slice(0,10);
+  render();
+}
+
+// ===== 圖表 =====
+let chart1, chart2;
+function draw(labels, rows) {
+  if (chart1) chart1.destroy();
+  if (chart2) chart2.destroy();
+  const fP = rows.map(r=>r.fP);
+  const pP = rows.map(r=>r.pP);
+  const fT = rows.map(r=>r.fTO);
+  const pT = rows.map(r=>r.pTO);
+
+  chart1 = new Chart(document.getElementById('c1'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: '富途價', data: fP, borderColor: '#0071e3', tension: 0.25 },
+        { label: '輝立價', data: pP, borderColor: '#34c759', tension: 0.25 }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } } }
+  });
+
+  chart2 = new Chart(document.getElementById('c2'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: '富途成交', data: fT, backgroundColor: '#a8d0ff' },
+        { label: '輝立成交', data: pT, backgroundColor: '#a8f0c0' }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } } }
+  });
+}
+
+// ===== 更新 / 定時 =====
+function slot() {
+  const n = new Date();
+  const h = String(n.getHours()).padStart(2,'0');
+  const m = Math.floor(n.getMinutes()/10)*10;
+  return h + ':' + String(m).padStart(2,'0');
+}
+
+function doUpdate() {
+  const d = key();
+  const day = mem[d] || {};
+  const syms = Object.keys(day);
+
+  if (!syms.length) {
+    // 示範資料
+    addRow('7672', slot(), 18.40, 12.90, 10.40, 10.52);
+    addRow('9917', slot(), 6.85, 7.45, 215.00, 218.00);
+    log('已加入示範資料（真實使用請貼上 aastocks 數字）');
+    return;
+  }
+
+  // 模擬小幅變動（方便測試流程）
+  syms.forEach(s => {
+    const last = (day[s] || []).at(-1);
+    if (!last) return;
+    const fTO = +(last.fTO * (0.97 + Math.random()*0.06)).toFixed(2);
+    const pTO = +(last.pTO * (0.97 + Math.random()*0.06)).toFixed(2);
+    const fP  = +(last.fP  * (0.997 + Math.random()*0.006)).toFixed(2);
+    const pP  = +(last.pP  * (0.997 + Math.random()*0.006)).toFixed(2);
+    addRow(s, slot(), fTO, pTO, fP, pP);
+  });
+  log('已更新（模擬）');
+}
+
+let timer = null, runs = 0;
+function toggleAuto() {
+  const btn = document.getElementById('autoBtn');
+  const st  = document.getElementById('status');
+
+  if (timer) {
+    clearInterval(timer); timer = null;
+    btn.textContent = '啟動定時';
+    st.textContent = '已停止'; st.className = 'badge off';
+    log('定時已停止');
+    return;
+  }
+
+  const mins = +document.getElementById('interval').value || 10;
+  const max  = +document.getElementById('maxRun').value;
+  runs = 0;
+
+  btn.textContent = '停止定時';
+  st.textContent = '運行中'; st.className = 'badge on';
+  log(`定時啟動，每 ${mins} 分鐘`);
+
+  const tick = () => {
+    const now = new Date().toTimeString().slice(0,5);
+    const s = document.getElementById('startT').value;
+    const e = document.getElementById('endT').value;
+    if (now < s || now > e) { log('非暗盤時段，跳過'); return; }
+    if (max > 0 && runs >= max) { toggleAuto(); return; }
+    runs++;
+    doUpdate();
+  };
+  tick();
+  timer = setInterval(tick, mins * 60000);
+}
+
+function clearDay() {
+  if (!confirm('確定清除今日全部資料？')) return;
+  delete mem[key()];
+  save();
+  render();
+  log('已清除');
+}
+
+function exportCSV() {
+  const d = key();
+  const day = mem[d] || {};
+  let csv = '股票,時間,富途成交,輝立成交,成交差額,富途價,輝立價,價格差額\n';
+  Object.keys(day).forEach(s => {
+    (day[s]||[]).forEach(r => {
+      const td = (r.fTO-r.pTO).toFixed(2);
+      const pd = (r.fP-r.pP).toFixed(2);
+      csv += `${s}.HK,${r.t},${r.fTO},${r.pTO},${td},${r.fP},${r.pP},${pd}\n`;
+    });
+  });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));
+  a.download = `暗盤_${d}.csv`;
+  a.click();
+  log('已匯出 CSV');
+}
+
+// 啟動
+render();
+</script>
+</body>
+</html>
