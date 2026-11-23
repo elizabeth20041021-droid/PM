@@ -14,7 +14,7 @@
     padding: 16px;
     font-size: 14px;
   }
-  .wrap { max-width: 920px; margin: 0 auto; }
+  .wrap { max-width: 900px; margin: 0 auto; }
   h1 { font-size: 20px; font-weight: 700; margin-bottom: 2px; }
   .sub { font-size: 12px; color: #86868b; margin-bottom: 14px; }
 
@@ -45,23 +45,23 @@
   }
   .card h2 { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
 
-  /* ===== 表格樣式（盡量接近圖二） ===== */
+  /* 表格區塊 */
   .stock-block {
-    margin-bottom: 28px;
+    margin-bottom: 32px;
     background: #fff;
     border-radius: 8px;
-    overflow: hidden;
+    padding: 12px 8px 8px;
   }
   .stock-title {
     text-align: center;
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 700;
-    padding: 10px 0 6px;
+    margin-bottom: 10px;
     letter-spacing: 0.5px;
   }
   .stock-actions {
     text-align: right;
-    padding: 0 8px 6px;
+    margin-bottom: 6px;
   }
   .stock-actions .btn { font-size: 12px; padding: 3px 8px; }
 
@@ -69,15 +69,15 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 13px;
-    border: 1px solid #333;
+    border: 1.5px solid #222;
   }
   table.gm th, table.gm td {
     border: 1px solid #333;
-    padding: 5px 6px;
+    padding: 6px 5px;
     text-align: center;
   }
   table.gm th {
-    background: #f7f7f7;
+    background: #f0f0f0;
     font-weight: 600;
     font-size: 12px;
   }
@@ -93,9 +93,9 @@
     outline: 2px solid #0071e3;
     background: #f0f7ff;
   }
-  .diff-up { color: #1a7f37; font-weight: 600; }
-  .diff-down { color: #d70015; font-weight: 600; }
-  .time-col { width: 64px; background: #fafafa; font-weight: 500; }
+  .diff-up { color: #1a7f37; font-weight: 700; }
+  .diff-down { color: #d70015; font-weight: 700; }
+  .time-col { width: 62px; background: #fafafa; font-weight: 500; }
 
   .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
   .label { font-size: 11px; color: #86868b; margin-bottom: 3px; }
@@ -104,15 +104,6 @@
     background: #fafafa; border-radius: 6px; padding: 6px 10px; margin-top: 8px;
   }
   .empty { text-align: center; color: #86868b; padding: 24px; font-size: 13px; }
-
-  /* 匯出用隱藏容器 */
-  #exportArea {
-    position: absolute;
-    left: -9999px;
-    top: 0;
-    background: #fff;
-    padding: 20px;
-  }
 </style>
 </head>
 <body>
@@ -132,7 +123,7 @@
   </div>
 
   <div class="card">
-    <h2>定時設定</h2>
+    <h2>定時設定（目前只能在網頁開著時運作）</h2>
     <div class="grid">
       <div>
         <div class="label">刷新間隔（分鐘）</div>
@@ -151,7 +142,10 @@
         <input type="time" id="endT" value="18:30" style="width:100%">
       </div>
     </div>
-    <div class="log" id="log">時間點固定：16:20 / 16:50 / 17:20 / 17:50 / 18:20 / 18:30</div>
+    <div class="log" id="log">
+      「啟動定時」= 在網頁開著的情況下，自動幫你準備下一個時間點的空白列。<br>
+      真正每天自動抓 aastocks 需要後端，前端做不到。
+    </div>
   </div>
 
   <div class="card">
@@ -160,26 +154,20 @@
       <input type="text" id="symInput" placeholder="例如：09941" style="flex:1;min-width:200px">
       <button class="btn primary" onclick="addSymbols()">加入</button>
     </div>
-    <p style="font-size:12px;color:#86868b;margin-top:8px">
-      今日 aastocks 顯示：<b>09941.HK（先通醫藥－Ｂ）</b>
-    </p>
   </div>
 
   <div id="tables"></div>
 </div>
-
-<!-- 專門用來產生乾淨 PNG 的區域 -->
-<div id="exportArea"></div>
 
 <script>
 const TIMES = ['16:20','16:50','17:20','17:50','18:20','18:30'];
 
 let store = {};
 function load() {
-  try { store = JSON.parse(localStorage.getItem('gm_v4') || '{}'); } catch(e) { store = {}; }
+  try { store = JSON.parse(localStorage.getItem('gm_v5') || '{}'); } catch(e) { store = {}; }
 }
 function save() {
-  try { localStorage.setItem('gm_v4', JSON.stringify(store)); } catch(e) {}
+  try { localStorage.setItem('gm_v5', JSON.stringify(store)); } catch(e) {}
 }
 load();
 
@@ -234,7 +222,7 @@ function render() {
 
   const syms = Object.keys(day).sort();
   if (!syms.length) {
-    box.innerHTML = '<div class="card empty">今日尚無股票<br>請先加入 09941</div>';
+    box.innerHTML = '<div class="card empty">今日尚無股票<br>請先加入代號</div>';
     return;
   }
 
@@ -355,7 +343,7 @@ function updateQuote() {
   });
   save();
   render();
-  log(n ? `已準備 ${n} 個時間點，請輸入數字` : '全部時間點已填滿');
+  log(n ? `已準備 ${n} 個時間點` : '全部時間點已填滿');
 }
 
 let timer = null, runs = 0;
@@ -374,7 +362,7 @@ function toggleAuto() {
   runs = 0;
   btn.textContent = '停止定時';
   st.textContent = '運行中'; st.className = 'badge on';
-  log(`定時啟動，每 ${mins} 分鐘`);
+  log(`定時啟動（僅限網頁開著時有效）`);
 
   const tick = () => {
     const now = new Date().toTimeString().slice(0,5);
@@ -397,7 +385,6 @@ function clearDay() {
   log('已清除');
 }
 
-// ===== 匯出 Excel (CSV) =====
 function exportExcel() {
   const d = key();
   const day = store[d] || {};
@@ -414,81 +401,41 @@ function exportExcel() {
   a.href = URL.createObjectURL(new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'}));
   a.download = `暗盤_${d}.csv`;
   a.click();
-  log('已匯出 Excel (CSV)');
+  log('已匯出 Excel');
 }
 
-// ===== 匯出 PNG（乾淨版，接近圖二）=====
+// ===== 改進的 PNG 匯出（直接截取畫面上的表格）=====
 async function exportPNG() {
-  const d = key();
-  const day = store[d] || {};
-  const syms = Object.keys(day).sort();
-  if (!syms.length) {
-    alert('沒有資料可匯出');
+  const blocks = document.querySelectorAll('.stock-block');
+  if (!blocks.length) {
+    alert('沒有表格可匯出');
     return;
   }
 
-  // 建立乾淨的匯出內容
-  const area = document.getElementById('exportArea');
-  area.innerHTML = '';
+  // 暫時隱藏操作按鈕，讓截圖更乾淨
+  document.querySelectorAll('.stock-actions').forEach(el => el.style.display = 'none');
 
-  syms.forEach(sym => {
-    const data = day[sym];
-    let html = `
-      <div style="margin-bottom:30px;font-family:Arial,sans-serif;">
-        <div style="text-align:center;font-size:20px;font-weight:bold;margin-bottom:8px;">${sym}.HK</div>
-        <table style="width:100%;border-collapse:collapse;font-size:13px;border:1px solid #000;">
-          <thead>
-            <tr>
-              <th style="border:1px solid #000;padding:6px;background:#f5f5f5;" rowspan="2">Time</th>
-              <th style="border:1px solid #000;padding:6px;background:#f5f5f5;" colspan="3">Turnover</th>
-              <th style="border:1px solid #000;padding:6px;background:#f5f5f5;" colspan="3">Price (HKD)</th>
-            </tr>
-            <tr>
-              <th style="border:1px solid #000;padding:5px;background:#f5f5f5;">Futu(M)</th>
-              <th style="border:1px solid #000;padding:5px;background:#f5f5f5;">Phillip(M)</th>
-              <th style="border:1px solid #000;padding:5px;background:#f5f5f5;">Diff(M)</th>
-              <th style="border:1px solid #000;padding:5px;background:#f5f5f5;">Futu</th>
-              <th style="border:1px solid #000;padding:5px;background:#f5f5f5;">Phillip</th>
-              <th style="border:1px solid #000;padding:5px;background:#f5f5f5;">Diff</th>
-            </tr>
-          </thead>
-          <tbody>`;
-
-    TIMES.forEach(t => {
-      const r = data[t] || {};
-      const toD = calcDiff(r.fTO, r.pTO);
-      const pD  = calcDiff(r.fP, r.pP);
-      html += `
-        <tr>
-          <td style="border:1px solid #000;padding:5px;text-align:center;">${t}</td>
-          <td style="border:1px solid #000;padding:5px;text-align:center;">${r.fTO||''}</td>
-          <td style="border:1px solid #000;padding:5px;text-align:center;">${r.pTO||''}</td>
-          <td style="border:1px solid #000;padding:5px;text-align:center;${toD.cls==='diff-up'?'color:#1a7f37;font-weight:bold;':toD.cls==='diff-down'?'color:#d70015;font-weight:bold;':''}">${toD.val}</td>
-          <td style="border:1px solid #000;padding:5px;text-align:center;">${r.fP||''}</td>
-          <td style="border:1px solid #000;padding:5px;text-align:center;">${r.pP||''}</td>
-          <td style="border:1px solid #000;padding:5px;text-align:center;${pD.cls==='diff-up'?'color:#1a7f37;font-weight:bold;':pD.cls==='diff-down'?'color:#d70015;font-weight:bold;':''}">${pD.val}</td>
-        </tr>`;
+  try {
+    // 一次截取所有表格區塊
+    const canvas = await html2canvas(document.getElementById('tables'), {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      logging: false
     });
-    html += `</tbody></table></div>`;
-    area.insertAdjacentHTML('beforeend', html);
-  });
 
-  // 等一下再截圖
-  await new Promise(r => setTimeout(r, 100));
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = `暗盤_${key()}.png`;
+    a.click();
+    log('已匯出 PNG（直接截取畫面）');
+  } catch (err) {
+    console.error(err);
+    alert('匯出失敗，請再試一次');
+  }
 
-  const canvas = await html2canvas(area, {
-    scale: 2,
-    backgroundColor: '#ffffff',
-    useCORS: true
-  });
-
-  const a = document.createElement('a');
-  a.href = canvas.toDataURL('image/png');
-  a.download = `暗盤_${d}.png`;
-  a.click();
-
-  area.innerHTML = ''; // 清掉
-  log('已匯出 PNG（格式接近圖二）');
+  // 恢復按鈕
+  document.querySelectorAll('.stock-actions').forEach(el => el.style.display = '');
 }
 
 render();
