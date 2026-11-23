@@ -116,6 +116,7 @@
     <button class="btn" id="autoBtn" onclick="toggleAuto()">啟動定時</button>
     
     <button class="btn green" onclick="document.getElementById('jsonFile').click()">匯入 JSON</button>
+    <button class="btn blue" onclick="pasteJSON()">貼上 JSON</button>
     <input type="file" id="jsonFile" accept=".json" onchange="importJSON(event)">
     
     <button class="btn" onclick="exportExcel()">匯出 Excel</button>
@@ -127,11 +128,11 @@
   <div class="card">
     <h2>操作說明（自動化流程）</h2>
     <div class="log" id="log">
-      <b>推薦流程（最穩定）：</b><br>
+      <b>推薦流程：</b><br>
       1. 安裝 Tampermonkey → 安裝「AAStocks 暗盤一鍵匯出」腳本<br>
       2. 打開 <a href="https://www.aastocks.com/tc/stocks/market/ipo/greymarket.aspx" target="_blank">AAStocks 暗盤頁</a><br>
-      3. 在暗盤頁按「一鍵匯出 JSON」或快捷鍵 → 自動下載符合本工具的 JSON<br>
-      4. 回到本頁點綠色「匯入 JSON」→ 資料自動填入對應時間點<br>
+      3. 在暗盤頁按「一鍵複製 JSON」或 <b>Ctrl + Shift + G</b><br>
+      4. 回到本頁點藍色「貼上 JSON」→ 資料自動填入<br>
       5. 可啟動「定時」在 16:15–18:30 自動準備空欄位<br><br>
       目前時間狀態會顯示在下方。
     </div>
@@ -326,7 +327,7 @@ function updateQuote() {
     if (t) { day[sym][t] = { fTO:'', pTO:'', fP:'', pP:'' }; n++; }
   });
   save(); render();
-  log(n ? `已準備 ${n} 個時間點（請用 AAStocks 腳本匯出後匯入）` : '全部時間點已填滿');
+  log(n ? `已準備 ${n} 個時間點（請用 AAStocks 腳本複製後貼上）` : '全部時間點已填滿');
 }
 
 let timer = null, runs = 0;
@@ -404,7 +405,6 @@ function importJSON(event) {
       const data = JSON.parse(e.target.result);
       let stocks = data.stocks || data;
       let targetDate = data.date || key();
-      // 支援腳本直接輸出 { "09941": { "16:20": {...} } } 或包 date 的格式
       if (data.date && data.stocks) {
         stocks = data.stocks;
         targetDate = data.date;
@@ -437,6 +437,32 @@ function importJSON(event) {
     }
   };
   reader.readAsText(file);
+}
+
+// 新增：從剪貼簿貼上 JSON
+async function pasteJSON() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text || !text.trim().startsWith('{')) {
+      alert('剪貼簿沒有有效的 JSON 資料\n請先在 AAStocks 頁面按「一鍵複製 JSON」');
+      return;
+    }
+
+    const blob = new Blob([text], { type: 'application/json' });
+    const file = new File([blob], 'paste.json', { type: 'application/json' });
+
+    const fakeEvent = {
+      target: {
+        files: [file],
+        value: ''
+      }
+    };
+
+    importJSON(fakeEvent);
+  } catch (err) {
+    console.error(err);
+    alert('無法讀取剪貼簿：' + err.message + '\n\n可能原因：\n1. 還沒允許網站存取剪貼簿\n2. 剪貼簿是空的');
+  }
 }
 
 render();
