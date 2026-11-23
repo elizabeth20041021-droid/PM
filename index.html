@@ -29,6 +29,7 @@
   }
   .btn:hover { background: #f0f0f2; }
   .btn.primary { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
+  .btn.green { background: #34c759; color: #fff; border-color: #34c759; }
   .btn.red { background: #ff3b30; color: #fff; border-color: #ff3b30; }
   input[type="date"], input[type="text"], input[type="number"], input[type="time"] {
     padding: 6px 10px; border: 1px solid #d2d2d7; border-radius: 7px; font-size: 13px;
@@ -45,7 +46,6 @@
   }
   .card h2 { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
 
-  /* 表格區塊 */
   .stock-block {
     margin-bottom: 32px;
     background: #fff;
@@ -100,10 +100,13 @@
   .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
   .label { font-size: 11px; color: #86868b; margin-bottom: 3px; }
   .log {
-    font-size: 12px; color: #86868b; max-height: 70px; overflow-y: auto;
+    font-size: 12px; color: #86868b; max-height: 80px; overflow-y: auto;
     background: #fafafa; border-radius: 6px; padding: 6px 10px; margin-top: 8px;
   }
   .empty { text-align: center; color: #86868b; padding: 24px; font-size: 13px; }
+
+  /* 隱藏的檔案選擇 */
+  #jsonFile { display: none; }
 </style>
 </head>
 <body>
@@ -116,6 +119,11 @@
     <button class="btn" onclick="changeDay(-1)">上一步</button>
     <button class="btn primary" onclick="updateQuote()">更新報價</button>
     <button class="btn" id="autoBtn" onclick="toggleAuto()">啟動定時</button>
+    
+    <!-- 新增：匯入 JSON -->
+    <button class="btn green" onclick="document.getElementById('jsonFile').click()">匯入 JSON</button>
+    <input type="file" id="jsonFile" accept=".json,application/json" onchange="importJSON(event)">
+    
     <button class="btn" onclick="exportExcel()">匯出 Excel</button>
     <button class="btn" onclick="exportPNG()">匯出 PNG</button>
     <button class="btn red" onclick="clearDay()">清除今日</button>
@@ -143,8 +151,7 @@
       </div>
     </div>
     <div class="log" id="log">
-      「啟動定時」= 在網頁開著的情況下，自動幫你準備下一個時間點的空白列。<br>
-      真正每天自動抓 aastocks 需要後端，前端做不到。
+      使用方法：Python 抓完資料後會產生 .json 檔 → 點「匯入 JSON」選擇該檔案即可自動填入表格。
     </div>
   </div>
 
@@ -222,7 +229,7 @@ function render() {
 
   const syms = Object.keys(day).sort();
   if (!syms.length) {
-    box.innerHTML = '<div class="card empty">今日尚無股票<br>請先加入代號</div>';
+    box.innerHTML = '<div class="card empty">今日尚無股票<br>請先加入代號 或 匯入 JSON</div>';
     return;
   }
 
@@ -404,7 +411,6 @@ function exportExcel() {
   log('已匯出 Excel');
 }
 
-// ===== 改進的 PNG 匯出（直接截取畫面上的表格）=====
 async function exportPNG() {
   const blocks = document.querySelectorAll('.stock-block');
   if (!blocks.length) {
@@ -412,11 +418,9 @@ async function exportPNG() {
     return;
   }
 
-  // 暫時隱藏操作按鈕，讓截圖更乾淨
   document.querySelectorAll('.stock-actions').forEach(el => el.style.display = 'none');
 
   try {
-    // 一次截取所有表格區塊
     const canvas = await html2canvas(document.getElementById('tables'), {
       scale: 2,
       backgroundColor: '#ffffff',
@@ -428,17 +432,37 @@ async function exportPNG() {
     a.href = canvas.toDataURL('image/png');
     a.download = `暗盤_${key()}.png`;
     a.click();
-    log('已匯出 PNG（直接截取畫面）');
+    log('已匯出 PNG');
   } catch (err) {
     console.error(err);
     alert('匯出失敗，請再試一次');
   }
 
-  // 恢復按鈕
   document.querySelectorAll('.stock-actions').forEach(el => el.style.display = '');
 }
 
-render();
-</script>
-</body>
-</html>
+// ===================== 核心：匯入 JSON =====================
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+
+      // 支援兩種格式：
+      // 1. 完整格式 { date, stocks: { "09941": { "16:20": {...} } } }
+      // 2. 直接是 stocks 物件
+
+      let stocks = data.stocks || data;
+      let targetDate = data.date || key();
+
+      // 切換到對應日期
+      document.getElementById('datePick').value = targetDate;
+
+      const day = ensure(targetDate);
+
+      let count = 0;
+      for (const [sym, times] of Object.entries(stocks)) {
+        if (!day[sym]) 
